@@ -35,6 +35,7 @@ import org.apache.http.impl.DefaultConnectionReuseStrategy;
 import org.apache.http.impl.EnglishReasonPhraseCatalog;
 import org.apache.http.impl.nio.DefaultHttpClientIODispatch;
 import org.apache.http.impl.nio.DefaultHttpServerIODispatch;
+import org.apache.http.impl.nio.pool.BasicNIOConnFactory;
 import org.apache.http.impl.nio.pool.BasicNIOConnPool;
 import org.apache.http.impl.nio.pool.BasicNIOPoolEntry;
 import org.apache.http.impl.nio.reactor.DefaultConnectingIOReactor;
@@ -149,8 +150,14 @@ public class NHttpReverseProxy {
 		                              new HttpAsyncRequester(
 		                                                     outhttpproc,
 		                                                     new ProxyOutgoingConnectionReuseStrategy());
+		clientSSLContext =
+		                   SSLUtil.createClientSSLContext(TRUST_STORE_LOCATION,
+		                                                  TRUST_STORE_PASSWORD);
 
-		ProxyConnPool connPool = new ProxyConnPool(connectingIOReactor, ConnectionConfig.DEFAULT);
+		BasicNIOConnFactory sslConnectionFactory =
+		                                           new BasicNIOConnFactory(clientSSLContext, null,
+		                                                                   ConnectionConfig.DEFAULT);
+		ProxyConnPool connPool = new ProxyConnPool(connectingIOReactor, sslConnectionFactory, 4000);
 		connPool.setMaxTotal(100);
 		connPool.setDefaultMaxPerRoute(20);
 
@@ -162,14 +169,11 @@ public class NHttpReverseProxy {
 		                                                             inhttpproc,
 		                                                             new ProxyIncomingConnectionReuseStrategy(),
 		                                                             handlerRegistry);
-		clientSSLContext =
-		                   SSLUtil.createClientSSLContext(TRUST_STORE_LOCATION,
-		                                                  TRUST_STORE_PASSWORD);
 
 		final IOEventDispatch connectingEventDispatch =
 		                                                new DefaultHttpClientIODispatch(
 		                                                                                clientHandler,
-		                                                                                clientSSLContext,
+		                                                                                // clientSSLContext,
 		                                                                                ConnectionConfig.DEFAULT);
 
 		serverSSLContext = SSLUtil.createServerSSLContext(KEY_STORE_LOCATION, KEY_STORE_PASSWORD);
@@ -938,8 +942,7 @@ public class NHttpReverseProxy {
 			super(ioreactor, config);
 		}
 
-		public ProxyConnPool(final ConnectingIOReactor ioreactor,
-		                     final NIOConnFactory<HttpHost, NHttpClientConnection> connFactory,
+		public ProxyConnPool(final ConnectingIOReactor ioreactor, final NIOConnFactory connFactory,
 		                     final int connectTimeout) {
 			super(ioreactor, connFactory, connectTimeout);
 		}
