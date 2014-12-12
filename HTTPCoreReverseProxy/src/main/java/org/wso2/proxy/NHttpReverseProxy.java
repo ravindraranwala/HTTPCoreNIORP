@@ -35,6 +35,7 @@ import org.apache.http.impl.DefaultConnectionReuseStrategy;
 import org.apache.http.impl.EnglishReasonPhraseCatalog;
 import org.apache.http.impl.nio.DefaultHttpClientIODispatch;
 import org.apache.http.impl.nio.DefaultHttpServerIODispatch;
+import org.apache.http.impl.nio.pool.BasicNIOConnFactory;
 import org.apache.http.impl.nio.pool.BasicNIOConnPool;
 import org.apache.http.impl.nio.pool.BasicNIOPoolEntry;
 import org.apache.http.impl.nio.reactor.DefaultConnectingIOReactor;
@@ -150,7 +151,12 @@ public class NHttpReverseProxy {
 		                                                     outhttpproc,
 		                                                     new ProxyOutgoingConnectionReuseStrategy());
 
-		ProxyConnPool connPool = new ProxyConnPool(connectingIOReactor, ConnectionConfig.DEFAULT);
+		clientSSLContext =
+				SSLUtil.createClientSSLContext(TRUST_STORE_LOCATION,
+						TRUST_STORE_PASSWORD);
+
+		ProxyConnPool connPool = new ProxyConnPool(connectingIOReactor,
+				new BasicNIOConnFactory(clientSSLContext, null, ConnectionConfig.DEFAULT), 5000);
 		connPool.setMaxTotal(100);
 		connPool.setDefaultMaxPerRoute(20);
 
@@ -162,14 +168,9 @@ public class NHttpReverseProxy {
 		                                                             inhttpproc,
 		                                                             new ProxyIncomingConnectionReuseStrategy(),
 		                                                             handlerRegistry);
-		clientSSLContext =
-		                   SSLUtil.createClientSSLContext(TRUST_STORE_LOCATION,
-		                                                  TRUST_STORE_PASSWORD);
-
 		final IOEventDispatch connectingEventDispatch =
 		                                                new DefaultHttpClientIODispatch(
 		                                                                                clientHandler,
-		                                                                                clientSSLContext,
 		                                                                                ConnectionConfig.DEFAULT);
 
 		serverSSLContext = SSLUtil.createServerSSLContext(KEY_STORE_LOCATION, KEY_STORE_PASSWORD);
