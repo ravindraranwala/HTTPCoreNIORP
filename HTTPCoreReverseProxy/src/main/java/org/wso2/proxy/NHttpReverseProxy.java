@@ -83,17 +83,18 @@ import org.apache.http.protocol.ResponseDate;
 import org.apache.http.protocol.ResponseServer;
 
 public class NHttpReverseProxy {
-	static int LOCAL_PORT;
-	static String REMOTE_HOST = null;
-	static int REMOTE_PORT;
+	private static int LOCAL_PORT;
+	private static String REMOTE_HOST = null;
+	private static int REMOTE_PORT;
 
-	public static boolean SECURE_BACKEND;
+	private static boolean SECURE_BACKEND;
+	private static boolean SECURE_PROXY;
 
-	public static String KEY_STORE_LOCATION;
-	public static String KEY_STORE_PASSWORD;
+	static String KEY_STORE_LOCATION;
+	static String KEY_STORE_PASSWORD;
 
-	public static String TRUST_STORE_LOCATION;
-	public static String TRUST_STORE_PASSWORD;
+	private static String TRUST_STORE_LOCATION;
+	private static String TRUST_STORE_PASSWORD;
 
 	private static Properties prop = new Properties();
 	private static SSLContext serverSSLContext;
@@ -109,7 +110,6 @@ public class NHttpReverseProxy {
 		String targetScheme = "http";
 		if (SECURE_BACKEND) {
 			targetScheme = "https";
-			// sslContext = KeyStoreLoader.getClientContext();
 		}
 
 		// Target host
@@ -150,14 +150,8 @@ public class NHttpReverseProxy {
 		                              new HttpAsyncRequester(
 		                                                     outhttpproc,
 		                                                     new ProxyOutgoingConnectionReuseStrategy());
-		clientSSLContext =
-		                   SSLUtil.createClientSSLContext(TRUST_STORE_LOCATION,
-		                                                  TRUST_STORE_PASSWORD);
 
-		BasicNIOConnFactory sslConnectionFactory =
-		                                           new BasicNIOConnFactory(clientSSLContext, null,
-		                                                                   ConnectionConfig.DEFAULT);
-		ProxyConnPool connPool = new ProxyConnPool(connectingIOReactor, sslConnectionFactory, 4000);
+		ProxyConnPool connPool = createConnectionPool(connectingIOReactor);
 		connPool.setMaxTotal(100);
 		connPool.setDefaultMaxPerRoute(20);
 
@@ -173,16 +167,10 @@ public class NHttpReverseProxy {
 		final IOEventDispatch connectingEventDispatch =
 		                                                new DefaultHttpClientIODispatch(
 		                                                                                clientHandler,
-		                                                                                // clientSSLContext,
 		                                                                                ConnectionConfig.DEFAULT);
 
-		serverSSLContext = SSLUtil.createServerSSLContext(KEY_STORE_LOCATION, KEY_STORE_PASSWORD);
-
 		final IOEventDispatch listeningEventDispatch =
-		                                               new DefaultHttpServerIODispatch(
-		                                                                               serviceHandler,
-		                                                                               // serverSSLContext,
-		                                                                               ConnectionConfig.DEFAULT);
+		                                               createListeningEventDispatcher(serviceHandler);
 
 		Thread t = new Thread(new Runnable() {
 
@@ -221,6 +209,61 @@ public class NHttpReverseProxy {
 
 	}
 
+	private static IOEventDispatch createListeningEventDispatcher(ProxyServiceHandler serviceHandler)
+	                                                                                                 throws KeyStoreException,
+	                                                                                                 NoSuchAlgorithmException,
+	                                                                                                 CertificateException,
+	                                                                                                 FileNotFoundException,
+	                                                                                                 IOException,
+	                                                                                                 UnrecoverableKeyException,
+	                                                                                                 KeyManagementException {
+		IOEventDispatch listeningEventDispatch = null;
+		if (SECURE_PROXY) {
+			// Using the HTTPS Endpoint of the reverse proxy service.
+			serverSSLContext =
+			                   SSLUtil.createServerSSLContext(KEY_STORE_LOCATION,
+			                                                  KEY_STORE_PASSWORD);
+			listeningEventDispatch =
+			                         new DefaultHttpServerIODispatch(serviceHandler,
+			                                                         serverSSLContext,
+			                                                         ConnectionConfig.DEFAULT);
+		} else {
+			// Using HTTP Endpoint of the reverse Proxy service.
+			listeningEventDispatch =
+			                         new DefaultHttpServerIODispatch(serviceHandler,
+			                                                         ConnectionConfig.DEFAULT);
+		}
+		return listeningEventDispatch;
+	}
+
+	private static ProxyConnPool createConnectionPool(final ConnectingIOReactor connectingIOReactor)
+	                                                                                                throws KeyManagementException,
+	                                                                                                KeyStoreException,
+	                                                                                                NoSuchAlgorithmException,
+	                                                                                                CertificateException,
+	                                                                                                FileNotFoundException,
+	                                                                                                IOException {
+		ProxyConnPool proxyConnPool = null;
+
+		if (SECURE_BACKEND) {
+			clientSSLContext =
+			                   SSLUtil.createClientSSLContext(TRUST_STORE_LOCATION,
+			                                                  TRUST_STORE_PASSWORD);
+
+			BasicNIOConnFactory connectionFactory =
+			                                        new BasicNIOConnFactory(
+			                                                                clientSSLContext,
+			                                                                null,
+			                                                                ConnectionConfig.DEFAULT);
+
+			proxyConnPool = new ProxyConnPool(connectingIOReactor, connectionFactory, 5000);
+		} else {
+			proxyConnPool = new ProxyConnPool(connectingIOReactor, ConnectionConfig.DEFAULT);
+		}
+
+		return proxyConnPool;
+	}
+
 	/**
 	 * reads the properties and starts the execution environment.
 	 */
@@ -233,8 +276,6 @@ public class NHttpReverseProxy {
 
 			// load a properties file
 			prop.load(input);
-
-			// isSsl = Boolean.parseBoolean(prop.getProperty("ssl"));
 
 			LOCAL_PORT = Integer.parseInt(prop.getProperty("localPort"));
 
@@ -250,6 +291,7 @@ public class NHttpReverseProxy {
 			TRUST_STORE_PASSWORD = String.valueOf(prop.getProperty("truststorepassword"));
 
 			SECURE_BACKEND = Boolean.parseBoolean(prop.getProperty("secureBackend"));
+			SECURE_PROXY = Boolean.parseBoolean(prop.getProperty("secureProxy"));
 
 		} catch (IOException ex) {
 			ex.printStackTrace();
