@@ -34,7 +34,7 @@ local.properties
 *.launch
 
 
-+
-+# IntelliJ
-+.idea
-+*.iml
+
+# IntelliJ
+.idea
+*.iml
