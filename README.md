@@ -15,7 +15,7 @@ keystore - file system location of the keystore
 keystorepassword - keystore password 
 truststore - file system location of the client trust store 
 truststorepassword - client trust store password 
-secureBackend - whether the backend service is exposed as a secure/HTTPS endpoint.
+secureBackend - whether the backend service is exposed as a secure/HTTPS endpoint or NOT.
 
 
 How to send the request from the client.
