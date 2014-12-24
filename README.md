@@ -20,10 +20,12 @@ secureBackend - whether the backend service is exposed as a secure/HTTPS endpoin
 
 How to send the request from the client.
 ===================================================
-First point your request to the proxy service and append the relative URL of the backend service to that. For an example,
+First, send your request to the proxy service and append the relative URL of the backend service to that. For an example,
 
 curl -v -k -d @sendReqThree.xml -H "Content-Type: text/xml; charset=utf-8" -H 'Host: w8cert.iconnectdata.com'  "SOAPAction:urn:authorizeComchekDraft" http://localhost:8585/IVRWS/services/IVRWS
 
 where the '/IVRWS/services/IVRWS' is the relative URL of the backend service 'w8cert.iconnectdata.com:443' which we need to invoke. Also makesure to give all the HTTP headers as specified in the above sample request. In this case the backend service runs on the 'w8cert.iconnectdata.com' host machine against the 443 port. HTTP Host header is a must in this case, and otherwise you may end up with HTTP 404 requested resource not found error.
+
+The backend service URL which we need to invoke here is : https://w8cert.iconnectdata.com/IVRWS/services/IVRWS
 
 
